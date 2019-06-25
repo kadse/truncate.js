@@ -1,4 +1,12 @@
-(function (module, $, undefined) {
+(function (root, factory) {
+  if (typeof define === 'function' && define.amd) {
+    define(['jQuery'], factory);
+  } else if (typeof module === 'object' && module.exports) {
+    module.exports = factory(require('jQuery'));
+  } else {
+    root.Truncate = factory(root.jQuery);
+  }
+}(this, function ($) {
 
   var BLOCK_TAGS = ['table', 'thead', 'tbody', 'tfoot', 'tr', 'col', 'colgroup', 'object', 'embed', 'param', 'ol', 'ul', 'dl', 'blockquote', 'select', 'optgroup', 'option', 'textarea', 'script', 'style'];
 
@@ -128,7 +136,7 @@
     while (low <= high) {
       mid = low + ((high - low) >> 1); // Integer division
 
-      chunk = trimRight(original.substr(0, mid + 1)) + options.ellipsis;
+      chunk = trimRight(original.substr(0, mid - 2)) + options.ellipsis;
       setText(element, chunk);
 
       if ($rootNode.height() > options.maxHeight) {
@@ -382,7 +390,7 @@
 
     this.config(options);
 
-    this.original = this.cached = element.innerHTML;
+    this.original = this.cached = element.innerHTML.trim();
 
     this.isTruncated = false; // True if the original content overflows the container.
     this.isCollapsed = true;  // True if the container is currently collapsed.
@@ -403,7 +411,7 @@
 
       if (this.options.lineHeight === 'auto') {
         var lineHeightCss = this.$element.css('line-height'),
-          lineHeight = 18; // for Normal we return the default value: 18px
+            lineHeight = 18; // for Normal we return the default value: 18px
 
         if (lineHeightCss !== "normal") {
           lineHeight = parseInt(lineHeightCss, 10);
@@ -442,8 +450,8 @@
       // Update HTML if provided, otherwise use the current html and restore
       // the truncated content to the original if it's currently present.
       if (typeof html !== 'undefined') {
-        this.original = this.element.innerHTML = html;
-      } else if (this.isCollapsed && this.element.innerHTML === this.cached) {
+        this.original = this.element.innerHTML = html.trim();
+      } else if (this.isCollapsed && this.element.innerHTML.trim() === this.cached) {
         this.element.innerHTML = this.original;
       }
 
@@ -475,7 +483,7 @@
       $wrap.replaceWith($wrap.contents());
 
       // Cache the truncated content
-      this.cached = this.element.innerHTML;
+      this.cached = this.element.innerHTML.trim();
 
       // If the container was expanded when .update() was called then restore
       // it to it's previous state.
@@ -514,7 +522,7 @@
      */
     collapse: function (retruncate) {
       this.isExplicitlyCollapsed = true;
-      
+
       if (this.isCollapsed) {
         return;
       }
@@ -527,6 +535,40 @@
       } else {
         this.element.innerHTML = this.cached;
       }
+    },
+
+    retruncate: function() {
+      var wasExpanded = !this.isCollapsed;
+
+      if (this.isCollapsed && this.element.innerHTML.trim() === this.cached) {
+        this.element.innerHTML = this.original;
+      }
+
+      // Wrap the contents in order to ignore container's margin/padding.
+      var $wrap = this.$element.wrapInner('<div/>').children();
+      $wrap.css({
+        border: 'none',
+        margin: 0,
+        padding: 0,
+        width: 'auto',
+        height: 'auto',
+        'word-wrap': 'break-word'
+      });
+
+      this.isTruncated = false;
+      // Check if already meets height requirement
+      if ($wrap.height() > this.options.maxHeight) {
+        this.isTruncated = truncateNestedNode($wrap, $wrap, this.$clipNode, this.options);
+        if (this.isTruncated) this.isCollapsed = true;
+      } else {
+        this.isCollapsed = false;
+      }
+
+      // Restore the wrapped contents
+      $wrap.replaceWith($wrap.contents());
+
+      // Cache the truncated content
+      this.cached = this.element.innerHTML.trim();
     }
   };
 
@@ -543,6 +585,6 @@
     });
   };
 
-  module.Truncate = Truncate;
+  return Truncate;
 
-})(this, jQuery);
+}));
